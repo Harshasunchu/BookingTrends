@@ -1,5 +1,6 @@
 # BookingTrends
-The code should executed with the data file(csv file) in the format
+example for data file is given in main branch as file booking_data.csv
+The code should be executed with the data file(csv file) in the format given below
 date,bookings
 2023-10-01,30
 2023-10-02,25
