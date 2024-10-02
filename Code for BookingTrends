@@ -1,0 +1,145 @@
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+
+# Function to log messages to a text file
+def log_message(message):
+    with open("booking_trends_log.txt", "a") as log_file:
+        log_file.write(f"{datetime.now()} - {message}\n")
+
+# Function to load booking data from CSV
+def load_booking_data(file_path):
+    try:
+        df = pd.read_csv(file_path, parse_dates=['date'])
+        if df.empty:
+            log_message("The booking data is empty.")
+            return None
+        df['date'] = pd.to_datetime(df['date'])
+        log_message("Booking data loaded successfully.")
+        log_message(f"Loaded DataFrame:\n{df}")
+        return df
+    except Exception as e:
+        log_message(f"Error loading booking data: {e}")
+        return None
+
+# Function to train a simple linear regression model for forecasting
+def train_model(df):
+    try:
+        df['day_of_year'] = df['date'].dt.dayofyear
+        X = df[['day_of_year']]
+        y = df['bookings']
+
+        log_message(f"Shape of X: {X.shape}, Shape of y: {y.shape}")
+
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        model = LinearRegression()
+        model.fit(X_train, y_train)
+
+        log_message("Model trained successfully.")
+        return model
+    except Exception as e:
+        log_message(f"Error training the model: {e}")
+        return None
+
+# Function to make predictions for the next days
+def predict_occupancy(model, days_ahead):
+    try:
+        future_days = pd.DataFrame({'day_of_year': np.arange(365, 365 + days_ahead)})
+        predictions = model.predict(future_days)
+        log_message("Occupancy predictions made successfully.")
+        return predictions
+    except Exception as e:
+        log_message(f"Error predicting occupancy: {e}")
+        return None
+
+# Function to identify low occupancy periods
+def identify_low_occupancy(df, threshold=30):
+    low_occupancy = df[df['predicted_bookings'] < threshold]
+    log_message(f"Identified low occupancy periods: {low_occupancy}")
+    return low_occupancy
+
+# Function to trigger marketing campaigns and save messages to a file
+def trigger_marketing_campaigns(low_occupancy_df):
+    campaigns = []
+    for index, row in low_occupancy_df.iterrows():
+        message = f"Special offer: Book now for {row['date'].strftime('%Y-%m-%d')} to get a discount!"
+        campaigns.append({
+            'date': row['date'],
+            'message': message
+        })
+
+        # Save the message to a separate file for that specific date
+        filename = f"campaign_{row['date'].strftime('%Y-%m-%d')}.txt"
+        with open(filename, 'a') as f:
+            f.write(message + "\n")
+        log_message(f"Campaign saved to {filename}")
+
+    log_message(f"Triggered {len(campaigns)} marketing campaigns.")
+    return campaigns
+
+# Function to generate personalized content
+def generate_personalized_content(customer_segments):
+    content = {}
+    for segment in customer_segments:
+        content[segment] = f"Exclusive offer for {segment}: Enjoy a relaxing stay with a complimentary breakfast!"
+    return content
+
+# Main function to run the solution
+def main():
+    # Step 1: Load booking data
+    booking_data = load_booking_data('booking_data.csv')
+
+    if booking_data is None:
+        log_message("Failed to load booking data. Exiting.")
+        return
+
+    # Step 2: Train the model
+    model = train_model(booking_data)
+
+    if model is None:
+        log_message("Model training failed. Exiting.")
+        return
+
+    # Step 3: Predict future occupancy for the next 30 days
+    predictions = predict_occupancy(model, 350)
+
+    # Log predictions shape
+    if predictions is not None:
+        log_message(f"Predictions shape: {predictions.shape}")
+    else:
+        log_message("No predictions were made.")
+        return
+
+    # Create a DataFrame for predictions
+    future_dates = [datetime.today() + timedelta(days=i) for i in range(350)]
+    future_df = pd.DataFrame({'date': future_dates, 'predicted_bookings': predictions})
+
+    # Identify low occupancy days based on predictions
+    low_occupancy_days = identify_low_occupancy(future_df, threshold=10)
+
+    if low_occupancy_days.empty:
+        log_message("No low occupancy periods detected.")
+        return
+
+    # Step 4: Trigger marketing campaigns
+    campaigns = trigger_marketing_campaigns(low_occupancy_days)
+
+    # Step 5: Generate personalized content for different customer segments
+    customer_segments = ['families', 'business travelers', 'couples']
+    personalized_content = generate_personalized_content(customer_segments)
+
+    # Display results in the log
+    log_message("Triggered Marketing Campaigns:")
+    for campaign in campaigns:
+        log_message(f"Date: {campaign['date'].strftime('%Y-%m-%d')}, Message: {campaign['message']}")
+
+    log_message("\nPersonalized Content:")
+    for segment, message in personalized_content.items():
+        log_message(f"{segment}: {message}")
+
+    log_message("All processes completed successfully.")
+
+if __name__ == "__main__":
+    main()
